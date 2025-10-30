@@ -553,6 +553,7 @@ const getPaymentsByUser = async (
   const result = await Payment.find(query)
     .populate({
       path: 'assigment',
+      populate:{path:'user', select:'firstName'},
       select: 'title budget status',
     })
     .populate({
