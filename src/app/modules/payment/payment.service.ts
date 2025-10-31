@@ -554,11 +554,11 @@ const getPaymentsByUser = async (
     .populate({
       path: 'assigment',
       populate:{path:'user', select:'firstName'},
-      select: 'title budget status',
+      select: 'title budget status uploadFile',
     })
     .populate({
       path: 'course',
-      select: 'title price discount status',
+      select: 'title price discount status courseVideo',
     })
     // .select('createdAt course assigment') //should be removed
     .skip(skip)
