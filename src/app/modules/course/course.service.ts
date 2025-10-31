@@ -173,7 +173,14 @@ const getSingleCourse = async (id: string) => {
   const result = await Course.findById(id).populate(
     'createdBy',
     'firstName lastName email role profileImage',
-  );
+  ).populate({
+      path: 'review', // populate the review array
+      select: 'rating comment createdAt', // fields from review
+      populate: {
+        path: 'user', // nested populate to get user info for each review
+        select: 'firstName lastName profileImage',
+      },
+    });
   if (!result) throw new AppError(400, 'course is not found');
   return result;
 };

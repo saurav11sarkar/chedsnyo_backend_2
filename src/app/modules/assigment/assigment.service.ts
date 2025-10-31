@@ -89,13 +89,16 @@ const getAllAssigments = async (params: any, options: IOption) => {
 };
 
 const getSingleAssigment = async (id: string) => {
-  const result = await Assigment.findById(id)
-    .populate('user', 'firstName lastName email role profileImage')
-    .populate({
-      path: 'review',
+
+  const result = await Assigment.findById(id).populate(
+    'user',
+    'firstName lastName email role profileImage',
+  ).populate({
+      path: 'review', // populate the review array
+      select: 'rating comment createdAt', // fields from review
       populate: {
-        path: 'user',
-        select: 'firstName lastName email role profileImage',
+        path: 'user', // nested populate to get user info for each review
+        select: 'firstName lastName profileImage',
       },
     });
   if (!result) throw new AppError(404, 'Assignment not found');
