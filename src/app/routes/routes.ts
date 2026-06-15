@@ -11,6 +11,10 @@ import { paymentRouter } from '../modules/payment/payment.routes';
 import { reviewRouter } from '../modules/reviews/reviews.routes';
 import { leaderBoardRouter } from '../modules/leaderBoard/leaderBoard.routes';
 import { dashboardRouter } from '../modules/dashboard/dashboard.routes';
+import { payoutRouter } from '../modules/payout/payout.routes';
+import { notificationRouter } from '../modules/notification/notification.routes';
+import { favoriteRouter } from '../modules/favorite/favorite.routes';
+import { reportRouter } from '../modules/report/report.routes';
 
 const router = Router();
 
@@ -62,6 +66,22 @@ const moduleRoutes = [
   {
     path: '/dashboard',
     route: dashboardRouter,
+  },
+  {
+    path: '/payout',
+    route: payoutRouter,
+  },
+  {
+    path: '/notification',
+    route: notificationRouter,
+  },
+  {
+    path: '/favorite',
+    route: favoriteRouter,
+  },
+  {
+    path: '/report',
+    route: reportRouter,
   },
 ];
 

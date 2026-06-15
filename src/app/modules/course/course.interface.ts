@@ -15,6 +15,7 @@ export interface ICourse {
   price?: number;
   discount?: number;
   status: 'approved' | 'rejected' | 'pending';
+  isPublic?: boolean;
   createdBy?: Types.ObjectId;
   application?: Types.ObjectId[];
   review?: Types.ObjectId[];

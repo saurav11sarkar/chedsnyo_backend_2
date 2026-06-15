@@ -4,13 +4,18 @@ import sendResponse from '../../utils/sendResponse';
 import { authService } from './auth.service';
 
 const registerUser = catchAsync(async (req, res) => {
-  const result = await authService.registerUser(req.body);
+  const payload = {
+    ...req.body,
+    ref: req.query.ref as string | undefined,
+    tosIp: req.ip || req.socket?.remoteAddress,
+  };
+  const result = await authService.registerUser(payload);
 
   sendResponse(res, {
     statusCode: 201,
     success: true,
-    message: 'User registered successfully. Please verify your email.',
-    data: result,
+    message: result.message,
+    data: result.user,
   });
 });
 
