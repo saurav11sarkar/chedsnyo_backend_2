@@ -1,691 +1,451 @@
-# Chedsnyo Backend API Feature Plan
+# DealClosedPartner.nl — Backend API ডকুমেন্টেশন (বাংলা)
 
-Ei docs ta image-er requirement onujayi banano. Main feature 3 ta:
+> Base URL: `http://localhost:5000/api/v1`  
+> সব Protected route-এ Header-এ `Authorization: Bearer <accessToken>` পাঠাতে হবে।
 
-1. Profile Promotion System
-2. Commission Structure
-3. Referral Program
+---
 
-Base API prefix:
+## পরিবর্তনের সারসংক্ষেপ (কী ছিল → কী হলো)
 
-```txt
-/api/v1
-```
+| বিষয় | আগে ছিল | এখন হয়েছে |
+|---|---|---|
+| Email Verification | `verified: true` (default) — যে কেউ সাথে সাথে লগইন করতে পারত | `verified: false` — রেজিস্ট্রেশনে OTP পাঠানো হয়, confirm করার পরেই লগইন হবে |
+| User Model | `balance`, `referredBy`, `commissionRate`, `tosAcceptedAt`, `tosIp` field ছিল না | সব নতুন field যোগ হয়েছে |
+| Referral Code | Field ছিল কিন্তু কোনো logic ছিল না | রেজিস্ট্রেশনে `?ref=CODE` দিলে referrer ট্র্যাক হয়; payment approve হলে referrer-এর balance-এ platform fee-র ২০% যায় |
+| Application System | Model-এ array ছিল, কিন্তু কোনো route ছিল না | Freelancer apply করতে পারে, Company দেখতে/accept/reject করতে পারে |
+| Payout System | কিছুই ছিল না | সম্পূর্ণ নতুন module — request, admin approve/reject, history |
+| Commission Control | ছিল না | Admin যেকোনো user-এর commission rate (0–100%) সেট করতে পারে |
+| Freelancer Dashboard | ছিল না | নতুন endpoint — balance, earnings, applied jobs, referral stats |
+| Company Dashboard | ছিল না | নতুন endpoint — job stats, applicant count, payment summary |
 
-## 1. Existing API Gulo
+---
 
-Ei API gulo already code-e ache. Egulo directly use kora jabe, kichu API-te fix/addition lagbe.
+## ১. Auth (লগইন / রেজিস্ট্রেশন)
 
-### Auth API
+### POST `/auth/register`
+নতুন user রেজিস্ট্রেশন। রেজিস্ট্রেশনের পরে email-এ OTP পাঠানো হবে।
 
-```txt
-POST /api/v1/auth/register
-POST /api/v1/auth/login
-POST /api/v1/auth/refresh-token
-POST /api/v1/auth/forgot-password
-POST /api/v1/auth/verify-email
-POST /api/v1/auth/reset-password
-POST /api/v1/auth/logout
-POST /api/v1/auth/change-password
-```
+**Query Param:** `?ref=REFERRALCODE` (optional — কেউ রেফার করলে তার code দিন)
 
-### User API
-
-```txt
-POST /api/v1/user/create-user
-GET /api/v1/user/profile
-PUT /api/v1/user/profile
-GET /api/v1/user/all-user
-GET /api/v1/user/:id
-DELETE /api/v1/user/:id
-PUT /api/v1/user/status/:id
-POST /api/v1/user/create-stripe-account
-GET /api/v1/user/dashboard-link
-GET /api/v1/user/enrollment-history
-```
-
-### Course API
-
-```txt
-POST /api/v1/course
-GET /api/v1/course
-GET /api/v1/course/my-course
-GET /api/v1/course/:id
-PUT /api/v1/course/:id
-DELETE /api/v1/course/:id
-PUT /api/v1/course/:id/status
-```
-
-### Assignment / Job API
-
-Code-e module name `assigment` ache.
-
-```txt
-POST /api/v1/assigment
-GET /api/v1/assigment
-GET /api/v1/assigment/my-assigments
-GET /api/v1/assigment/:id
-PUT /api/v1/assigment/:id
-DELETE /api/v1/assigment/:id
-PUT /api/v1/assigment/:id/status
-```
-
-### Payment API
-
-```txt
-POST /api/v1/payment/assasment/:id
-POST /api/v1/payment/assasment/approve/:id
-POST /api/v1/payment/assasment/reject/:id
-POST /api/v1/payment/course/:id
-POST /api/v1/payment/course/approve/:id
-POST /api/v1/payment/course/reject/:id
-GET /api/v1/payment
-GET /api/v1/payment/my/all
-GET /api/v1/payment/my
-GET /api/v1/payment/seller/payments
-GET /api/v1/payment/stats/dashboard
-GET /api/v1/payment/:id
-```
-
-### Other API
-
-```txt
-/api/v1/industry
-/api/v1/blog
-/api/v1/conversation
-/api/v1/message
-/api/v1/review
-/api/v1/leaderboard
-/api/v1/dashboard/overview
-/api/v1/dashboard/monthly-earnings
-```
-
-## 2. Je Existing API Fix Korte Hobe
-
-### 2.1 Register API Fix
-
-Existing:
-
-```txt
-POST /api/v1/auth/register
-```
-
-Problem:
-
-- User model-e `referralCode` ache, but referral system complete na.
-- Register korar somoy referral code accept kore referred user track korte hobe.
-
-Fix:
-
-Request body-te optional referral code nite hobe:
-
+**Body:**
 ```json
 {
   "firstName": "Rahim",
   "lastName": "Uddin",
-  "email": "rahim@gmail.com",
-  "password": "123456",
+  "email": "rahim@example.com",
+  "password": "password123",
   "role": "seles",
-  "industry": "INDUSTRY_ID",
-  "kvkVatNumber": "123456",
-  "ref": "ABC123"
+  "industry": "<industryId>",
+  "kvkVatNumber": "12345678"
 }
 ```
+- `role` হতে পারে: `seles` (freelancer), `business` (company), `admin`
+- `business` role-এ `businessName` লাগবে
 
-Backend logic:
+**Response:** `201` — user তৈরি হবে, email-এ OTP যাবে
 
-- New user-er jonno unique referral code generate korte hobe.
-- Jodi `ref` thake, oi code diye referrer user find korte hobe.
-- New user-er `referredBy` field-e referrer user id save korte hobe.
+---
 
-User model-e add korte hobe:
+### POST `/auth/verify-email`
+রেজিস্ট্রেশনের পর OTP দিয়ে email verify করুন।
 
-```ts
-referralCode: string;
-referredBy?: ObjectId;
-referralRate?: number;
-referralBalance?: number;
-commissionRate?: number;
-commissionEnabled?: boolean;
+**Body:**
+```json
+{ "email": "rahim@example.com", "otp": "123456" }
 ```
 
-### 2.2 Payment Approve API Fix
+---
 
-Existing:
+### POST `/auth/login`
+**Body:**
+```json
+{ "email": "rahim@example.com", "password": "password123" }
+```
+**Response:** `accessToken`, `refreshToken` (cookie-তে), `user`
 
-```txt
-POST /api/v1/payment/course/approve/:id
-POST /api/v1/payment/assasment/approve/:id
+---
+
+### POST `/auth/refresh-token`
+Cookie থেকে refresh token নিয়ে নতুন access token দেবে।
+
+---
+
+### POST `/auth/forgot-password`
+**Body:** `{ "email": "rahim@example.com" }`
+Email-এ OTP পাঠাবে।
+
+---
+
+### POST `/auth/reset-password`
+**Body:** `{ "email": "rahim@example.com", "newPassword": "newpass123" }`
+
+---
+
+### POST `/auth/change-password` (Protected)
+**Body:** `{ "oldPassword": "old", "newPassword": "new" }`
+
+---
+
+### POST `/auth/logout` (Protected)
+Cookie clear করে logout করবে।
+
+---
+
+## ২. User / প্রোফাইল
+
+### GET `/user/profile` (Protected)
+লগইন করা user-এর নিজের profile দেখুন।
+
+### PUT `/user/profile` (Protected)
+Profile update করুন। `multipart/form-data` — `profileImage` file optional।
+
+### GET `/user/all-user`
+সব user-এর list। Query: `?searchTerm=&role=&status=&page=&limit=`
+
+### GET `/user/:id`
+একজন user-এর profile + তার সব assignment + course।
+
+### DELETE `/user/:id` (Protected — Admin)
+User delete করুন।
+
+### PUT `/user/status/:id` (Protected — Admin)
+**Body:** `{ "status": "approved" }` — `approved` / `rejected` / `pending`
+
+### PUT `/user/commission/:id` (Protected — Admin) — নতুন
+Admin যেকোনো user-এর commission rate পরিবর্তন করতে পারবে।
+
+**Body:** `{ "commissionRate": 10 }` — ০ থেকে ১০০ এর মধ্যে
+
+### GET `/user/wallet/balance` (Protected) — নতুন
+লগইন করা user-এর wallet balance ও commission rate দেখুন।
+
+**Response:**
+```json
+{ "balance": 150.50, "commissionRate": 15 }
 ```
 
-Problem:
+### GET `/user/enrollment-history` (Protected)
+User কোন assignment/course-এ enroll হয়েছে তার history।
 
-- Current code-e commission hardcoded `15%`.
-- Image requirement onujayi:
-  - Freelancer/job earning commission default `15%`
-  - Course sales commission default `10%`
-  - Referral commission default `5%` platform earning theke
-  - Admin user-wise commission change korte parbe
-  - Admin 0% commission set korte parbe
+### POST `/user/create-stripe-account` (Protected)
+Stripe Express account তৈরি করুন (onboarding link পাবেন)।
 
-Fix:
+### GET `/user/dashboard-link` (Protected)
+Stripe dashboard login link পান।
 
-- Hardcoded `0.15` remove kore DB settings theke commission nite hobe.
-- Assignment payment-e freelancer commission use korte hobe.
-- Course payment-e course commission use korte hobe.
-- Payment approve hole referral earning calculate korte hobe.
+---
 
-Example calculation:
+## ৩. Assignment (Job Post)
 
-```txt
-Course price = 100
-Course commission = 10%
-Platform earning = 10
-Seller earning = 90
-Referral commission = 5% of platform earning
-Referral earning = 0.50
-Final admin earning = 9.50
-```
+### POST `/assigment` (Protected — Business)
+নতুন job post করুন। `multipart/form-data`।
 
-Payment model-e add/fix korte hobe:
-
-```ts
-sellerEarning: number;
-adminEarning: number;
-referralEarning: number;
-commissionRate: number;
-referralRate: number;
-referralUser?: ObjectId;
-```
-
-Current fields:
-
-```ts
-userFree
-adminFree
-```
-
-Recommended rename:
-
-```ts
-sellerEarning
-adminEarning
-```
-
-## 3. New API Banate Hobe
-
-## 3.1 Promotion API
-
-Base route:
-
-```txt
-/api/v1/promotion
-```
-
-Purpose:
-
-- Freelancer/company nijer profile promote korte parbe.
-- User job/assignment promote korte parbe.
-- User course promote korte parbe.
-- User promotion analytics dekhte parbe.
-- Admin dekhte parbe ke ki promote korche.
-- Admin promotion free grant/block/remove korte parbe.
-
-### Promotion Model
-
-New file:
-
-```txt
-src/app/modules/promotion/promotion.model.ts
-```
-
-Suggested schema:
-
-```ts
-user: ObjectId;
-targetType: 'profile' | 'assignment' | 'course';
-targetId: ObjectId;
-views: number;
-clicks: number;
-startDate: Date;
-endDate: Date;
-status: 'pending' | 'active' | 'blocked' | 'expired' | 'removed';
-isFree: boolean;
-```
-
-### Promotion Endpoints
-
-Create promotion:
-
-```txt
-POST /api/v1/promotion
-```
-
-Auth:
-
-```txt
-business, seles
-```
-
-Body:
-
+**Fields:** `banner` (file), `uploadFile` (file, optional), `data` (JSON string):
 ```json
 {
-  "targetType": "profile",
-  "targetId": "USER_ID",
-  "startDate": "2026-05-22",
-  "endDate": "2026-06-22"
+  "title": "Logo Design",
+  "description": "Need a logo",
+  "budget": "500",
+  "priceType": "fixed",
+  "deadLine": "2026-12-31"
 }
 ```
 
-Get my promotions:
+### GET `/assigment`
+সব job list। Query: `?searchTerm=&status=&page=&limit=`
 
-```txt
-GET /api/v1/promotion/my
-```
+### GET `/assigment/my-assigments` (Protected — Business)
+নিজের সব job post।
 
-Get admin promotion list:
+### GET `/assigment/:id`
+একটি job-এর detail (reviews সহ)।
 
-```txt
-GET /api/v1/promotion/admin
-```
+### PUT `/assigment/:id` (Protected — Business)
+Job update করুন।
 
-Update promotion status:
+### DELETE `/assigment/:id` (Protected — Business)
+Job delete করুন।
 
-```txt
-PATCH /api/v1/promotion/:id/status
-```
+### PUT `/assigment/:id/status` (Protected — Admin)
+**Body:** `{ "status": "approved" }`
 
-Body:
+---
 
+### Application System — নতুন
+
+### POST `/assigment/:id/apply` (Protected — Seles/Freelancer)
+Freelancer job-এ apply করবে।
+
+### GET `/assigment/:id/applicants` (Protected — Business)
+Job owner সব applicant দেখবে।
+
+### PUT `/assigment/:id/applicants/:freelancerId/accept` (Protected — Business)
+একজন freelancer-কে accept করুন।
+
+### PUT `/assigment/:id/applicants/:freelancerId/reject` (Protected — Business)
+একজন freelancer-কে reject করুন (application list থেকে সরিয়ে দেবে)।
+
+---
+
+## ৪. Course
+
+### POST `/course` (Protected — Business/Seles)
+নতুন course তৈরি। `multipart/form-data` — `courseVideo`, `thumbnail`, `extraFiles[]`।
+
+### GET `/course`
+সব course। Query: `?searchTerm=&status=&page=&limit=`
+
+### GET `/course/:id`
+Course detail।
+
+### PUT `/course/:id` (Protected)
+Course update।
+
+### DELETE `/course/:id` (Protected)
+Course delete।
+
+---
+
+## ৫. Payment (Stripe)
+
+### POST `/payment/assignment-checkout` (Protected)
+Assignment-এর জন্য Stripe checkout session তৈরি।
+
+**Body:** `{ "assasmtId": "<assignmentId>" }`
+
+### POST `/payment/course-checkout` (Protected)
+Course-এর জন্য Stripe checkout session।
+
+**Body:** `{ "courseId": "<courseId>" }`
+
+### PUT `/payment/approve-assignment/:paymentId` (Protected — Business)
+Assignment payment approve — টাকা seller-এ transfer হবে (৮৫%), admin fee ১৫%।
+Referral: buyer যদি কারো referral code দিয়ে রেজিস্টার করে থাকে, সেই referrer-এর balance-এ platform fee-র ২০% যাবে।
+
+### PUT `/payment/reject-assignment/:paymentId` (Protected — Business)
+Reject — buyer-কে refund।
+
+### PUT `/payment/approve-course/:paymentId` (Protected — Business)
+Course payment approve।
+
+### PUT `/payment/reject-course/:paymentId` (Protected — Business)
+Course payment reject।
+
+### GET `/payment` (Protected — Admin)
+সব payment। Query: `?searchTerm=&status=&minAmount=&maxAmount=&page=&limit=`
+
+### GET `/payment/my` (Protected — Business/Seles)
+নিজের payment history (seller হিসেবে)।
+
+### GET `/payment/buyer-history` (Protected)
+Buyer হিসেবে নিজের payment history।
+
+### GET `/payment/:id` (Protected)
+একটি payment-এর detail।
+
+---
+
+## ৬. Payout System — সম্পূর্ণ নতুন
+
+Freelancer/Business তাদের wallet balance থেকে payout request করতে পারবে।
+সর্বনিম্ন payout amount: **$20**
+
+### POST `/payout` (Protected — Seles/Business)
+Payout request পাঠান।
+
+**Body (IBAN):**
 ```json
 {
-  "status": "blocked"
+  "amount": 100,
+  "method": "iban",
+  "accountDetails": "NL91ABNA0417164300"
 }
 ```
 
-Track view:
-
-```txt
-POST /api/v1/promotion/:id/view
-```
-
-Track click:
-
-```txt
-POST /api/v1/promotion/:id/click
-```
-
-Grant free promotion:
-
-```txt
-POST /api/v1/promotion/:id/free
-```
-
-Body:
-
+**Body (PayPal):**
 ```json
 {
-  "startDate": "2026-05-22",
-  "endDate": "2026-06-22"
+  "amount": 50,
+  "method": "paypal",
+  "accountDetails": "myemail@paypal.com"
 }
 ```
 
-## 3.2 Commission API
+### GET `/payout/my` (Protected — Seles/Business)
+নিজের সব payout request history।
 
-Base route:
+### GET `/payout` (Protected — Admin)
+সব payout request।
 
-```txt
-/api/v1/commission
-```
+### PUT `/payout/:id/approve` (Protected — Admin)
+Payout approve করুন।
 
-Purpose:
+**Body:** `{ "adminNote": "Processed via bank transfer" }` (optional)
 
-- Default commission manage.
-- Freelancer earning commission.
-- Course sale commission.
-- Referral commission.
-- User-wise commission override.
-- 0% commission support.
+### PUT `/payout/:id/reject` (Protected — Admin)
+Payout reject করুন — balance ফেরত যাবে।
 
-### Commission Settings Model
+**Body:** `{ "adminNote": "Invalid IBAN" }` (required)
 
-New file:
+---
 
-```txt
-src/app/modules/commission/commission.model.ts
-```
+## ৭. Dashboard
 
-Suggested schema:
+### GET `/dashboard/overview` (Protected — Admin)
+মোট revenue, business count, seles count।
 
-```ts
-freelancerCommission: number; // default 15
-courseCommission: number; // default 10
-referralCommission: number; // default 5
-```
+### GET `/dashboard/monthly-earnings` (Protected — Admin)
+মাসিক earnings। Query: `?year=2026`
 
-### Commission Endpoints
+### GET `/dashboard/freelancer` (Protected — Seles) — নতুন
+Freelancer-এর নিজের dashboard।
 
-Get settings:
-
-```txt
-GET /api/v1/commission/settings
-```
-
-Update settings:
-
-```txt
-PATCH /api/v1/commission/settings
-```
-
-Auth:
-
-```txt
-admin
-```
-
-Body:
-
+**Response:**
 ```json
 {
-  "freelancerCommission": 15,
-  "courseCommission": 10,
-  "referralCommission": 5
+  "user": { "firstName": "...", "balance": 150, "commissionRate": 15 },
+  "stats": {
+    "walletBalance": 150,
+    "commissionRate": 15,
+    "appliedAssignments": 5,
+    "totalCourses": 2,
+    "approvedCourses": 1,
+    "totalEarned": 850,
+    "referralCount": 3
+  }
 }
 ```
 
-Update user commission:
+### GET `/dashboard/company` (Protected — Business) — নতুন
+Company-র নিজের dashboard।
 
-```txt
-PATCH /api/v1/commission/user/:userId
-```
-
-Auth:
-
-```txt
-admin
-```
-
-Body:
-
+**Response:**
 ```json
 {
-  "commissionRate": 0,
-  "commissionEnabled": false
+  "user": { "businessName": "...", "balance": 0 },
+  "stats": {
+    "totalJobs": 10,
+    "approvedJobs": 7,
+    "pendingJobs": 3,
+    "totalApplicants": 42,
+    "paymentSummary": {
+      "pending": { "count": 2, "total": 500 },
+      "approved": { "count": 5, "total": 2500 }
+    }
+  }
 }
 ```
 
-Admin commission summary:
+---
 
-```txt
-GET /api/v1/commission/admin/summary
-```
+## ৮. Leaderboard
 
-## 3.3 Referral API
+### GET `/leaderboard`
+Query: `?filter=weekly` / `monthly` / `yearly` (default: yearly)
+Freelancer-দের ranking — course sales ও rating-এর উপর ভিত্তি করে।
 
-Base route:
+---
 
-```txt
-/api/v1/referral
-```
+## ৯. Review
 
-Purpose:
+### POST `/review` (Protected)
+Review দিন।
 
-- Every user unique referral code/link pabe.
-- Referral diye signup hole relation save hobe.
-- Referred user platform earning generate korle referrer 5% pabe.
-- Referral earning dashboard-e visible hobe.
-- Admin referral rate override korte parbe.
+**Body:** `{ "rating": 5, "comment": "Excellent!", "assignment": "<id>" }` বা `"course": "<id>"`
 
-### Referral Model
+### GET `/review`
+সব review।
 
-New file:
+### PUT `/review/:id` (Protected)
+Review update।
 
-```txt
-src/app/modules/referral/referral.model.ts
-```
+### DELETE `/review/:id` (Protected)
+Review delete।
 
-Suggested schema:
+---
 
-```ts
-referrer: ObjectId;
-referredUser: ObjectId;
-sourcePayment?: ObjectId;
-platformEarning: number;
-earningAmount: number;
-rate: number;
-status: 'pending' | 'approved' | 'paid';
-```
+## ১০. Chat
 
-### Referral Endpoints
+### POST `/conversation` (Protected)
+নতুন conversation শুরু।
 
-Get my referral info:
+**Body:** `{ "receiverId": "<userId>" }`
 
-```txt
-GET /api/v1/referral/me
-```
+### GET `/conversation` (Protected)
+নিজের সব conversation।
 
-Response example:
+### POST `/message` (Protected)
+Message পাঠান। `multipart/form-data` — `attachment` (file, optional)।
 
-```json
-{
-  "referralCode": "ABC123",
-  "referralLink": "https://frontend.com/register?ref=ABC123",
-  "totalReferred": 5,
-  "totalEarning": 25
-}
-```
+**Body/Form:** `conversationId`, `message`
 
-Get my referral earnings:
+### GET `/message/:conversationId` (Protected)
+একটি conversation-এর সব message।
 
-```txt
-GET /api/v1/referral/earnings
-```
+### PUT `/message/:id` (Protected)
+Message edit।
 
-Admin referral report:
+### DELETE `/message/:id` (Protected)
+Message delete।
 
-```txt
-GET /api/v1/referral/admin
-```
+---
 
-Update user referral rate:
+## ১১. Blog
 
-```txt
-PATCH /api/v1/referral/user/:userId/rate
-```
+### POST `/blog` (Protected — Admin)
+Blog তৈরি।
 
-Auth:
+### GET `/blog`
+সব blog।
 
-```txt
-admin
-```
+### GET `/blog/:id`
+Blog detail।
 
-Body:
+### PUT `/blog/:id` (Protected — Admin)
+Blog update।
 
-```json
-{
-  "referralRate": 5
-}
-```
+### DELETE `/blog/:id` (Protected — Admin)
+Blog delete।
 
-## 4. Required New Module Files
+---
 
-Promotion module:
+## ১২. Industry
 
-```txt
-src/app/modules/promotion/promotion.interface.ts
-src/app/modules/promotion/promotion.model.ts
-src/app/modules/promotion/promotion.service.ts
-src/app/modules/promotion/promotion.controller.ts
-src/app/modules/promotion/promotion.routes.ts
-```
+### POST `/industry` (Protected — Admin)
+Industry তৈরি।
 
-Commission module:
+### GET `/industry`
+সব industry।
 
-```txt
-src/app/modules/commission/commission.interface.ts
-src/app/modules/commission/commission.model.ts
-src/app/modules/commission/commission.service.ts
-src/app/modules/commission/commission.controller.ts
-src/app/modules/commission/commission.routes.ts
-```
+### GET `/industry/:id`
+Industry detail।
 
-Referral module:
+### PUT `/industry/:id` (Protected — Admin)
+Industry update।
 
-```txt
-src/app/modules/referral/referral.interface.ts
-src/app/modules/referral/referral.model.ts
-src/app/modules/referral/referral.service.ts
-src/app/modules/referral/referral.controller.ts
-src/app/modules/referral/referral.routes.ts
-```
+### DELETE `/industry/:id` (Protected — Admin)
+Industry delete।
 
-Main route file-e add korte hobe:
+---
 
-```txt
-src/app/routes/routes.ts
-```
+## Role সারণী
 
-Add:
+| Role | মানে | সংক্ষিপ্ত বিবরণ |
+|---|---|---|
+| `admin` | Admin | Platform পরিচালনা করে |
+| `business` | Company | Job post করে, freelancer hire করে |
+| `seles` | Freelancer | Job-এ apply করে, course তৈরি করে |
 
-```ts
-{
-  path: '/promotion',
-  route: promotionRoutes,
-},
-{
-  path: '/commission',
-  route: commissionRoutes,
-},
-{
-  path: '/referral',
-  route: referralRoutes,
-},
-```
-
-## 5. Implementation Order
-
-Recommended order:
-
-1. User model update korte hobe.
-2. Register API-te referral code logic add korte hobe.
-3. Commission module banate hobe.
-4. Payment approve logic-e dynamic commission add korte hobe.
-5. Referral module banate hobe.
-6. Payment approve logic-e referral earning add korte hobe.
-7. Promotion module banate hobe.
-8. Dashboard/report API-te promotion/referral/commission data add korte hobe.
-
-## 6. Frontend Theke API Use Flow
-
-### Referral Signup Flow
-
-1. User link pabe:
-
-```txt
-https://frontend.com/register?ref=ABC123
-```
-
-2. Frontend register API call korbe:
-
-```txt
-POST /api/v1/auth/register
-```
-
-3. Body-te `ref` pathabe.
-
-4. Backend new user-er `referredBy` save korbe.
-
-### Course Payment Flow
-
-1. User course buy korbe:
-
-```txt
-POST /api/v1/payment/course/:courseId
-```
-
-2. Payment success hole creator approve korbe:
-
-```txt
-POST /api/v1/payment/course/approve/:paymentId
-```
-
-3. Backend calculate korbe:
-
-```txt
-course commission
-seller earning
-admin earning
-referral earning
-```
-
-### Assignment Payment Flow
-
-1. User assignment/job payment korbe:
-
-```txt
-POST /api/v1/payment/assasment/:assignmentId
-```
-
-2. Owner approve korbe:
-
-```txt
-POST /api/v1/payment/assasment/approve/:paymentId
-```
-
-3. Backend calculate korbe:
-
-```txt
-freelancer commission
-seller earning
-admin earning
-referral earning
-```
-
-### Promotion Flow
-
-1. User promotion create korbe:
-
-```txt
-POST /api/v1/promotion
-```
-
-2. Listing page-e promoted item show korle:
-
-```txt
-POST /api/v1/promotion/:id/view
-```
-
-3. User promoted item click korle:
-
-```txt
-POST /api/v1/promotion/:id/click
-```
-
-4. User analytics dekhbe:
-
-```txt
-GET /api/v1/promotion/my
-```
-
-5. Admin monitor korbe:
-
-```txt
-GET /api/v1/promotion/admin
-```
-
-## 7. Short Summary
-
-Existing code-e auth, user, course, assignment, payment already ache.
-
-Image-er requirement complete korte hole:
-
-- `auth/register` fix korte hobe referral code support-er jonno.
-- `payment approve` logic fix korte hobe dynamic commission and referral earning-er jonno.
-- `user` model update korte hobe referral/commission field diye.
-- `payment` model update korte hobe earning breakdown diye.
-- New `promotion` API banate hobe.
-- New `commission` API banate hobe.
-- New `referral` API banate hobe.
-
-
+---
+
+## নতুন যা যোগ হয়েছে (সংক্ষিপ্ত)
+
+1. **Email Verification Bug ফিক্স** — এখন OTP confirm না করলে login হবে না
+2. **User Model** — `balance`, `referredBy`, `commissionRate`, `tosAcceptedAt`, `tosIp` field যোগ
+3. **Referral System** — `?ref=CODE` দিয়ে register করলে tracking হয়; payment approve-এ referrer ২০% পায়
+4. **Application System** — Freelancer apply করতে পারে, company accept/reject করতে পারে
+5. **Payout System** — IBAN/PayPal payout request, admin approve/reject, balance refund
+6. **Commission Control** — Admin প্রতি user-এর commission ০-১০০% সেট করতে পারে
+7. **Wallet Balance API** — `/user/wallet/balance`
+8. **Freelancer Dashboard** — `/dashboard/freelancer`
+9. **Company Dashboard** — `/dashboard/company`

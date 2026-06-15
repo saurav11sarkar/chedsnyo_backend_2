@@ -124,6 +124,19 @@ const enrollmentHistory = catchAsync(async (req, res) => {
   });
 });
 
+const setCommissionRate = catchAsync(async (req, res) => {
+  const { id } = req.params;
+  const { commissionRate } = req.body;
+  const result = await userService.setCommissionRate(id, commissionRate);
+  sendResponse(res, { statusCode: 200, success: true, message: result.message, data: result.user });
+});
+
+const getUserBalance = catchAsync(async (req, res) => {
+  const userId = req.user?.id;
+  const result = await userService.getUserBalance(userId);
+  sendResponse(res, { statusCode: 200, success: true, message: 'Balance fetched', data: result });
+});
+
 export const userController = {
   createUser,
   getAllUser,
@@ -135,4 +148,6 @@ export const userController = {
   createStripeAccount,
   getStripeDashboardLink,
   enrollmentHistory,
+  setCommissionRate,
+  getUserBalance,
 };
