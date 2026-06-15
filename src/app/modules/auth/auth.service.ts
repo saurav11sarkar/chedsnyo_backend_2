@@ -11,7 +11,9 @@ import bcrypt from 'bcryptjs';
 import createOtpTemplate from '../../utils/createOtpTemplate';
 import { userRole } from '../user/user.constant';
 
-const registerUser = async (payload: Partial<IUser>) => {
+const registerUser = async (
+  payload: Partial<IUser> & { ref?: string; tosIp?: string },
+) => {
   const exist = await User.findOne({ email: payload.email });
   if (exist) throw new AppError(400, 'User already exists');
 
@@ -30,11 +32,54 @@ const registerUser = async (payload: Partial<IUser>) => {
 
   if (payload.role === userRole.admin) {
     payload.status = 'approved';
+    payload.verified = true;
   }
+
+  // Referral tracking — ?ref=<referralCode>
+  if (payload.ref) {
+    const referrer = await User.findOne({ referralCode: payload.ref });
+    if (referrer) {
+      payload.referredBy = referrer._id as any;
+    }
+  }
+  delete (payload as any).ref;
+
+  // ToS acceptance
+  if (payload.tosIp) {
+    payload.tosAcceptedAt = new Date();
+  }
+
+  // Generate unique referral code for new user
+  const refCode =
+    Math.random().toString(36).substring(2, 8).toUpperCase() +
+    Date.now().toString(36).toUpperCase();
+  payload.referralCode = refCode;
+
+  // Generate OTP for email verification
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  payload.otp = otp;
+  payload.otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
+  payload.verified = payload.verified ?? false;
 
   const user = await User.create(payload);
 
-  return user;
+  // Send verification OTP (skip for admin)
+  if (user.role !== userRole.admin) {
+    await sendMailer(
+      user.email,
+      user.firstName + ' ' + (user.lastName || ''),
+      createOtpTemplate(otp, user.email, 'DealClosedPartner'),
+    );
+  }
+
+  const { password, otp: _otp, ...userWithoutSensitive } = user.toObject();
+  return {
+    message:
+      user.role === userRole.admin
+        ? 'Admin account created'
+        : 'Registration successful. Please check your email for the OTP to verify your account.',
+    user: userWithoutSensitive,
+  };
 };
 
 const loginUser = async (payload: Partial<IUser>) => {
