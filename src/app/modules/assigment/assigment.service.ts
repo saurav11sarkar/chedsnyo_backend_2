@@ -229,6 +229,119 @@ const updateStatus = async (id: string, status: string) => {
   return updated;
 };
 
+// Freelancer applies for a job
+const applyForAssignment = async (assignmentId: string, freelancerId: string) => {
+  const assignment = await Assigment.findById(assignmentId);
+  if (!assignment) throw new AppError(404, 'Assignment not found');
+  if (assignment.status !== 'approved')
+    throw new AppError(400, 'This assignment is not open for applications');
+  if (assignment.user?.toString() === freelancerId)
+    throw new AppError(400, 'You cannot apply for your own assignment');
+
+  const alreadyApplied = assignment.application?.some(
+    (id) => id.toString() === freelancerId,
+  );
+  if (alreadyApplied) throw new AppError(400, 'You have already applied');
+
+  assignment.application = [...(assignment.application || []), freelancerId as any];
+  await assignment.save();
+
+  return { message: 'Application submitted successfully' };
+};
+
+// Company views all applicants for their assignment
+const getApplicants = async (assignmentId: string, ownerId: string) => {
+  const assignment = await Assigment.findById(assignmentId).populate(
+    'application',
+    'firstName lastName email profileImage role location specialties overviewExperience',
+  );
+  if (!assignment) throw new AppError(404, 'Assignment not found');
+  if (assignment.user?.toString() !== ownerId)
+    throw new AppError(403, 'You are not authorized to view applicants');
+
+  return assignment.application;
+};
+
+// Company accepts a freelancer's application
+const acceptApplicant = async (
+  assignmentId: string,
+  freelancerId: string,
+  ownerId: string,
+) => {
+  const assignment = await Assigment.findById(assignmentId);
+  if (!assignment) throw new AppError(404, 'Assignment not found');
+  if (assignment.user?.toString() !== ownerId)
+    throw new AppError(403, 'Not authorized');
+
+  const applied = assignment.application?.some(
+    (id) => id.toString() === freelancerId,
+  );
+  if (!applied) throw new AppError(400, 'This freelancer has not applied');
+
+  return { message: 'Applicant accepted. Proceed to payment to hire.' };
+};
+
+// Company rejects a freelancer's application
+const rejectApplicant = async (
+  assignmentId: string,
+  freelancerId: string,
+  ownerId: string,
+) => {
+  const assignment = await Assigment.findById(assignmentId);
+  if (!assignment) throw new AppError(404, 'Assignment not found');
+  if (assignment.user?.toString() !== ownerId)
+    throw new AppError(403, 'Not authorized');
+
+  assignment.application = (assignment.application || []).filter(
+    (id) => id.toString() !== freelancerId,
+  );
+  await assignment.save();
+
+  return { message: 'Applicant rejected' };
+};
+
+// Update work status — company or assigned freelancer can update
+const updateWorkStatus = async (
+  assignmentId: string,
+  userId: string,
+  workStatus: 'in-progress' | 'completed' | 'cancelled' | 'disputed',
+) => {
+  const assignment = await Assigment.findById(assignmentId);
+  if (!assignment) throw new AppError(404, 'Assignment not found');
+
+  const isOwner = assignment.user?.toString() === userId;
+  const isFreelancer = assignment.assignedFreelancer?.toString() === userId;
+
+  if (!isOwner && !isFreelancer)
+    throw new AppError(403, 'Not authorized to update work status');
+
+  if (assignment.status !== 'approved')
+    throw new AppError(400, 'Assignment must be approved before updating work status');
+
+  const validTransitions: Record<string, string[]> = {
+    'not-started': ['in-progress', 'cancelled'],
+    'in-progress': ['completed', 'cancelled', 'disputed'],
+    'completed': [],
+    'cancelled': [],
+    'disputed': ['completed', 'cancelled'],
+  };
+
+  const current = assignment.workStatus || 'not-started';
+  if (!validTransitions[current]?.includes(workStatus)) {
+    throw new AppError(400, `Cannot transition from "${current}" to "${workStatus}"`);
+  }
+
+  assignment.workStatus = workStatus;
+  assignment.workStatusUpdatedAt = new Date();
+
+  if (workStatus === 'in-progress' && !assignment.assignedFreelancer) {
+    assignment.assignedFreelancer = userId as any;
+  }
+
+  await assignment.save();
+  return assignment;
+};
+
 export const assigmentService = {
   createAssigment,
   updateAssigment,
@@ -237,4 +350,8 @@ export const assigmentService = {
   getAllAssigments,
   getSingleAssigment,
   myAllAssigments,
+  applyForAssignment,
+  getApplicants,
+  acceptApplicant,
+  rejectApplicant,
 };

@@ -25,7 +25,21 @@ const getMonthlyEarnings = catchAsync(async (req, res) => {
   });
 });
 
+const freelancerDashboard = catchAsync(async (req, res) => {
+  const userId = req.user?.id;
+  const result = await dashboardService.freelancerDashboard(userId);
+  sendResponse(res, { statusCode: 200, success: true, message: 'Freelancer dashboard', data: result });
+});
+
+const companyDashboard = catchAsync(async (req, res) => {
+  const userId = req.user?.id;
+  const result = await dashboardService.companyDashboard(userId);
+  sendResponse(res, { statusCode: 200, success: true, message: 'Company dashboard', data: result });
+});
+
 export const dashboardController = {
   dashboardOverview,
   getMonthlyEarnings,
+  freelancerDashboard,
+  companyDashboard,
 };

@@ -10,6 +10,7 @@ export interface IUser {
   profileImage?: string;
   goal?: string;
   referralCode?: string;
+  referredBy?: Types.ObjectId;
   overviewExperience?: string;
   specialties?: string;
   achievements?: string;
@@ -23,4 +24,8 @@ export interface IUser {
   industry?: Types.ObjectId;
   kvkVatNumber?: string;
   status?: 'approved' | 'rejected' | 'pending';
+  balance?: number;
+  commissionRate?: number;
+  tosAcceptedAt?: Date;
+  tosIp?: string;
 }

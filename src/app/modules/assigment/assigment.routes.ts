@@ -44,4 +44,13 @@ router.put(
   assigmentController.updateStatus,
 );
 
+// Application routes
+router.post('/:id/apply', auth(userRole.seles), assigmentController.applyForAssignment);
+router.get('/:id/applicants', auth(userRole.business), assigmentController.getApplicants);
+router.put('/:id/applicants/:freelancerId/accept', auth(userRole.business), assigmentController.acceptApplicant);
+router.put('/:id/applicants/:freelancerId/reject', auth(userRole.business), assigmentController.rejectApplicant);
+
+// Work status tracking route (company + freelancer can update)
+router.put('/:id/work-status', auth(userRole.business, userRole.seles), assigmentController.updateWorkStatus);
+
 export const assigmentRouter = router;
