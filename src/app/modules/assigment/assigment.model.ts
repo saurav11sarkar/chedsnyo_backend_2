@@ -42,6 +42,22 @@ const assigmentSchema = new mongoose.Schema<IAssigment>(
       enum: ['approved', 'rejected', 'pending'],
       default: 'pending',
     },
+    workStatus: {
+      type: String,
+      enum: ['not-started', 'in-progress', 'completed', 'cancelled', 'disputed'],
+      default: 'not-started',
+    },
+    assignedFreelancer: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+    },
+    workStatusUpdatedAt: {
+      type: Date,
+    },
+    isPublic: {
+      type: Boolean,
+      default: true,
+    },
     application: [
       {
         type: mongoose.Schema.Types.ObjectId,
