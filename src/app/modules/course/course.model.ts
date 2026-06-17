@@ -21,6 +21,10 @@ const courseSchema = new mongoose.Schema<ICourse>(
       enum: ['approved', 'rejected', 'pending'],
       default: 'pending',
     },
+    isPublic: {
+      type: Boolean,
+      default: true,
+    },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',

@@ -103,10 +103,19 @@ const getLeaderboard = async (
     return b.totalSales - a.totalSales;
   });
 
+  // Assign badges based on rank
+  const withBadges = populatedLeaderboard.map((item, index) => {
+    let badge = '';
+    if (index === 0) badge = 'gold';
+    else if (index <= 2) badge = 'silver';
+    else if (index <= 9) badge = 'bronze';
+    else badge = 'rising';
 
-  const total = populatedLeaderboard.length;
-  const paginated = populatedLeaderboard.slice(skip, skip + limit);
+    return { ...item, rank: index + 1, badge };
+  });
 
+  const total = withBadges.length;
+  const paginated = withBadges.slice(skip, skip + limit);
 
   return {
     meta: {

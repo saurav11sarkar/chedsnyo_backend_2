@@ -205,6 +205,25 @@ const enrollmentHistory = async (userId: string) => {
   };
 };
 
+const setCommissionRate = async (userId: string, commissionRate: number) => {
+  if (commissionRate < 0 || commissionRate > 100)
+    throw new AppError(400, 'Commission rate must be between 0 and 100');
+
+  const user = await User.findById(userId);
+  if (!user) throw new AppError(404, 'User not found');
+
+  user.commissionRate = commissionRate;
+  await user.save();
+
+  return { message: `Commission rate updated to ${commissionRate}%`, user };
+};
+
+const getUserBalance = async (userId: string) => {
+  const user = await User.findById(userId).select('firstName lastName email balance commissionRate');
+  if (!user) throw new AppError(404, 'User not found');
+  return { balance: user.balance || 0, commissionRate: user.commissionRate || 15 };
+};
+
 export const userService = {
   createUser,
   getAllUser,
@@ -216,4 +235,6 @@ export const userService = {
   createStripeAccount,
   getStripeDashboardLink,
   enrollmentHistory,
+  setCommissionRate,
+  getUserBalance,
 };

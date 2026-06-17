@@ -16,4 +16,7 @@ router.get(
   dashboardController.getMonthlyEarnings,
 );
 
+router.get('/freelancer', auth(userRole.seles), dashboardController.freelancerDashboard);
+router.get('/company', auth(userRole.business), dashboardController.companyDashboard);
+
 export const dashboardRouter = router;
