@@ -41,5 +41,7 @@ router.get('/:id', userController.getUserById);
 
 router.delete('/:id', auth(userRole.admin), userController.deleteUserById);
 router.put('/status/:id', auth(userRole.admin), userController.updateStatus);
+router.put('/commission/:id', auth(userRole.admin), userController.setCommissionRate);
+router.get('/wallet/balance', auth(userRole.admin, userRole.business, userRole.seles), userController.getUserBalance);
 
 export const userRoutes = router;

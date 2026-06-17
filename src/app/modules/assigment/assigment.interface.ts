@@ -11,6 +11,10 @@ export interface IAssigment {
   uploadFile?: string;
   user?: Types.ObjectId;
   status?: 'approved' | 'rejected' | 'pending';
+  workStatus?: 'not-started' | 'in-progress' | 'completed' | 'cancelled' | 'disputed';
+  assignedFreelancer?: Types.ObjectId;
+  workStatusUpdatedAt?: Date;
+  isPublic?: boolean;
   application?: Types.ObjectId[];
   review?: Types.ObjectId[];
 }
