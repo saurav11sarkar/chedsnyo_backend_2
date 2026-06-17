@@ -143,6 +143,42 @@ const updateStatus = catchAsync(async (req, res) => {
   });
 });
 
+const applyForAssignment = catchAsync(async (req, res) => {
+  const freelancerId = req.user?.id;
+  const { id } = req.params;
+  const result = await assigmentService.applyForAssignment(id, freelancerId);
+  sendResponse(res, { success: true, statusCode: 200, message: result.message, data: null });
+});
+
+const getApplicants = catchAsync(async (req, res) => {
+  const ownerId = req.user?.id;
+  const { id } = req.params;
+  const result = await assigmentService.getApplicants(id, ownerId);
+  sendResponse(res, { success: true, statusCode: 200, message: 'Applicants fetched', data: result });
+});
+
+const acceptApplicant = catchAsync(async (req, res) => {
+  const ownerId = req.user?.id;
+  const { id, freelancerId } = req.params;
+  const result = await assigmentService.acceptApplicant(id, freelancerId, ownerId);
+  sendResponse(res, { success: true, statusCode: 200, message: result.message, data: null });
+});
+
+const rejectApplicant = catchAsync(async (req, res) => {
+  const ownerId = req.user?.id;
+  const { id, freelancerId } = req.params;
+  const result = await assigmentService.rejectApplicant(id, freelancerId, ownerId);
+  sendResponse(res, { success: true, statusCode: 200, message: result.message, data: null });
+});
+
+const updateWorkStatus = catchAsync(async (req, res) => {
+  const userId = req.user?.id;
+  const { id } = req.params;
+  const { workStatus } = req.body;
+  const result = await assigmentService.updateWorkStatus(id, userId, workStatus);
+  sendResponse(res, { success: true, statusCode: 200, message: 'Work status updated', data: result });
+});
+
 export const assigmentController = {
   createAssigment,
   updateAssigment,
@@ -151,4 +187,9 @@ export const assigmentController = {
   getAllAssigments,
   getSingleAssigment,
   myAllAssigments,
+  applyForAssignment,
+  getApplicants,
+  acceptApplicant,
+  rejectApplicant,
+  updateWorkStatus,
 };

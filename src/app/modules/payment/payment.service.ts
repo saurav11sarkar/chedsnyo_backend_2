@@ -9,6 +9,7 @@ import Payment from './payment.model';
 import Course from '../course/course.model';
 import pagination, { IOption } from '../../helper/pagenation';
 import mongoose from 'mongoose';
+import { notificationService } from '../notification/notification.service';
 
 const stripe = new Stripe(config.stripe.secretKey!);
 
@@ -212,6 +213,31 @@ const approveAssasmentPayment = async (
   payment.paymentDate = new Date();
   await payment.save();
 
+  // Referral: 20% of platform fee goes to referrer
+  const buyerUser = await User.findById(payment.user).populate('referredBy');
+  if (buyerUser?.referredBy) {
+    const referralBonus = Math.round(adminCents * 0.2) / 100;
+    const referrerId = (buyerUser.referredBy as any)._id || buyerUser.referredBy;
+    await User.findByIdAndUpdate(referrerId, {
+      $inc: { balance: referralBonus },
+    });
+    await notificationService.createNotification({
+      recipient: referrerId,
+      type: 'referral_bonus',
+      title: 'Referral Bonus Received!',
+      body: `You earned €${referralBonus.toFixed(2)} referral bonus from a payment.`,
+    });
+  }
+
+  // Notify buyer
+  await notificationService.createNotification({
+    recipient: payment.user,
+    type: 'payment_approved',
+    title: 'Payment Approved',
+    body: `Your payment for "${assasmt.title}" has been approved.`,
+    relatedId: payment._id as any,
+  });
+
   return {
     message:
       'Payment approved: 85% transferred to seller, 15% kept as admin fee',
@@ -263,6 +289,15 @@ const rejectAssasmentPayment = async (
     );
     await assasmtDoc.save();
   }
+
+  // Notify buyer
+  await notificationService.createNotification({
+    recipient: payment.user,
+    type: 'payment_rejected',
+    title: 'Payment Rejected',
+    body: `Your payment has been rejected and refunded.`,
+    relatedId: payment._id as any,
+  });
 
   return { message: 'Payment rejected and refunded to buyer' };
 };
@@ -316,6 +351,15 @@ const approveCoursePayment = async (paymentId: string, businessId: string) => {
   if (!course.application.includes(payment.user)) {
     course.application.push(payment.user);
     await course.save();
+  }
+
+  // Referral: 20% of platform fee goes to referrer
+  const buyerUser = await User.findById(payment.user).populate('referredBy');
+  if (buyerUser?.referredBy) {
+    const referralBonus = Math.round(adminCents * 0.2) / 100;
+    await User.findByIdAndUpdate(buyerUser.referredBy, {
+      $inc: { balance: referralBonus },
+    });
   }
 
   return {
